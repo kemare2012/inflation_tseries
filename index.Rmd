@@ -1,0 +1,182 @@
+---
+title: "Inflation Trends in Terra: An R-Based Time Series Visualization"
+author: "Martina Regis"
+toc: true
+number-sections: false
+format:
+  html: 
+    theme: cosmo
+    fontsize: 1.4em
+    fontcolor: '#024161'
+    backgroundcolor: '#f2f7f7'
+    linestretch: 1.7
+    embed-resources: true
+    fig-height: 5.5
+    fig-width: 7.5
+    code-fold: false
+---
+
+![Photo: Indusind Bank](inflation.jpg){}
+
+```{r}
+#| label: load-pkgs
+#| code-summary: "Packages"
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(zoo)
+library(lubridate)
+library(scales)
+library(kableExtra)
+library(formattable)
+library(plotly)
+library(readxl)
+library(thematic)
+library(ggplot2)
+blue_theme <- function() {
+    theme(
+    # add border)
+    panel.background = element_rect(colour = "#f2f7f7", fill = "#f2f7f7"),
+    # color background)
+    plot.background = element_rect(fill = "#f2f7f7", color = "navy", linetype = 2),
+    # modify grid)
+    panel.grid.major = element_line(colour = "white", size = 0.6),
+    # modify text, axis and colour 4) and 5)
+    axis.text = element_text(colour = "#024161"),
+    plot.title = element_text(size = rel(1.2), color = "#024161", face = "bold", hjust = 0.5),
+        plot.caption = element_text(size = rel(0.6), color = "#909090", face = "italic"),
+    axis.title = element_text(colour = "steelblue"),
+    # legend at the bottom)
+    legend.position = "bottom"
+  )
+}
+```
+
+## Introduction
+
+In this post, I will use data from a fictitious country called Terra (latin for Earth), to examine the evolution of inflation over an extended time using quarterly data. This summary is intended to highlight manipulating a few time series functions, particularly how to convert a character (string) column to a Date column in an R data frame. This is mostly done using the *as.Date()* function and the lubridate package in R to convert the string format into a date format. Managing dates and times in R is crucial for various data analysis tasks, including time series analysis, data visualization, and data manipulation.
+
+This summary also made use of an interpolation technique which estimates missing values based on the surrounding data points, assuming a continuous relationship. This was done via `na.approx()` from `zoo` package. I will also make some use of the dplyr functionalities to place data in a tabular format, then present some functionalities of `ggplot2` for presenting the plots, particularly periods of high inflation.
+
+Use was made of `tidyverse`, `lubridate`, `zoo` packages and functionalities for date handling and `kableExtra` to present tabular information. The data is loaded from an excel file
+
+In this example, we assume that the country collects data on the Consumer Price Index (CPI) each quarter. The inflation rate between two periods of time is the variation of this index in the reference period. CPI is calculated using a basket of prices of a variety of consumer goods. 
+
+First, let us load the dataset from the excel file, create time series and then view its main characteristics
+
+```{r}
+# Load dataset
+cpi_all <- read_excel("terra_cpi.xlsx")
+
+# Convert to date format
+cpi_all$Date <- as.Date(cpi_all$Date, format = "%Y-%m-%d")
+class(cpi_all$Date)
+
+# view first 6 rows of the dataframe 
+head(cpi_all)
+
+# View the structure (str) of the data 
+str(cpi_all)
+```
+
+The table presents inflation information using kableExtra:
+
+```{r}
+cpi_all%>% 
+  slice(1:10) %>%
+  kable(digits = 2, caption = "Inflation Data Sample") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", position = "left"))
+```
+
+
+## Trends with Missing Values
+
+Datasets frequently contain missing values, a common issue that must be addressed before any meaningful analysis can be performed.  These missing values can arise from various sources, such as data entry errors, incomplete surveys, or sensor malfunctions.  Ignoring them can lead to biased or inaccurate results. Several strategies exist for handling missing data.  One approach is deletion, where rows or columns with missing values are removed, though this can reduce the sample size and potentially introduce bias if the missing data are not random.  
+
+Another option is imputation, where missing values are replaced with estimated ones.  Imputation methods range from simple techniques like replacing with the mean or median to more sophisticated approaches like k-nearest neighbors imputation or regression-based imputation. The choice of method depends on the nature and extent of the missing data, as well as the specific goals of the analysis. Careful consideration of these strategies is crucial for ensuring the validity and reliability of any subsequent data analysis.
+
+The next chart shows the line chart showing 4 periods of missing data in 2018.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-inf
+#| fig-cap: "Basic Line Chart with missing data"
+
+fig1<-ggplot(cpi_all, aes(Date, Value))+
+  geom_line(linewidth = 1.5, color = "navyblue")+
+  labs(y = "%",
+       x= "",
+       caption = "Source: Terra CSO \n with missing date",
+       title = "Year-on-Year Inflation in Terra")+
+  scale_x_date(date_breaks = "18 months", date_labels = "%b-%y")+
+  blue_theme()
+fig1
+```
+
+## Dealing with Missing Values - Interpolation
+
+Interpolation is a method of estimating missing values based on the surrounding known values. It is particularly useful when dealing with time series data or any dataset where the missing values are not randomly distributed.
+
+There are various interpolation methods, but the focus here is on linear interpolation. Linear interpolation assumes a straight line between two known points and estimates the missing values along that line.
+
+The zoo library in R is designed to handle irregular time series data. It provides a collection of functions for working with ordered observations, including the *na.approx()* function for interpolating missing values. 
+The na.approx() syntax allows us to interpolate missing values in a data frame column:
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-missing
+#| fig-cap: "Population Growth Trends in Selected Countries"
+
+# Missing Values
+cpi_all<- cpi_all %>%
+  mutate(Value = na.approx(Value))
+```
+
+
+## Trends in Inflation
+
+Inflation in Terra has undergone several shifts in recent years. The COVID-19 pandemic initially caused a dip in inflation due to decreased demand. However, as economies reopened, supply chain disruptions and increased consumer spending led to a surge in inflation. The conflict in Ukraine exacerbated this trend, particularly impacting energy and food prices, which further fueled inflationary pressures. The reference line chart was created using ggplot2 functionalities and visually depicts these changes, showing a trough during the pandemic's onset, followed by a sharp rise in the post-pandemic period, with a potential further uptick after the Ukraine conflict.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: fig-terra
+#| fig-cap: "Inflation Trends"
+
+# Putting it all together
+cpi_all %>%
+  ggplot(aes(Date, Value)) +
+  geom_rect(aes(xmin = as.Date("2020-03-01"), xmax = as.Date("2021-06-01"), ymin = -Inf, ymax = Inf), fill = "skyblue", alpha = 0.2) +
+  annotate("text", x= as.Date("2020-05-01"), y = 6.5, label = "Covid \npan-\ndemic", size = 3) +
+  geom_line(lwd = 1.2, color = "navy") +
+  geom_vline(xintercept = as.Date("2022-02-24"), color = "orange", linetype = "dashed", size = 2) +
+  annotate("text", x = as.Date("2021-12-01"), y = 9.0, label = "Ukraine \n conflict", size = 3) +
+  scale_x_date(breaks = scales::date_breaks("20 months"), date_labels = "%b-%y") +
+  theme_minimal() +
+  labs(title = "Evolution of Terra's inflation (Year-on-Year", 
+       x = "", 
+       y = "%", 
+       caption = "Source: TCSO \nMissing data interpolated")+
+  blue_theme()
+```
+
+Let’s examine the plot which highlights the trends in inflation in Terra since 2002 through the `ggplot2` visualisation functionalities:
+
+1. The blue band covers the COVID lockdown period is made with *geom_rect.* I have set some value of alpha After this geom, I have added text with *annotate*.  
+
+2. The evolution of inflation is presented with geom_line. I have changed width with lwd and also the color set to navy. This line is plotted after geom_rect to make it visible during the COVID lockdown.  
+
+3. The start of the Ukraine conflict is presented with *geom_vline*. I have used *linetype = "dashed"* to present a dashed line. Again, *annotate* was used to add text.  
+
+4. With *scale_x_date*, a scale break is set for 20 months.
+
+
+## Creating a Customized Theme for Plots
+
+Finally, in the charts presented in this post, I wanted to create my own distintive and customised which coul be used across all of the charts on this page. I wanted the background color of the charts to be consistent with the page background and also wanted the colors to be consistent with the blues which were created in the `YAML.`  Hence I created a theme called *blue_theme* which would contain all of the elements which I wanted to be adopted across the charts of this post.
+
+
