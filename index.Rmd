@@ -87,7 +87,7 @@ The table presents inflation information using kableExtra:
 cpi_all%>% 
   slice(1:10) %>%
   kable(digits = 2, caption = "Inflation Data Sample") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed", position = "left"))
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", position = "float_right"))
 ```
 
 
